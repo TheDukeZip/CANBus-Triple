@@ -28,6 +28,17 @@
 #define CAN3SELECT 5
 #define CAN3RESET 11
 
+#define D6 27
+#define D8 28
+#define D9 29
+#define D10 30
+#define A0 36
+#define A1 37
+#define A2 38
+#define A3 39
+#define A4 40
+#define A5 41
+
 CANBus CANBus1(CAN1SELECT, CAN1RESET, 1, "Bus 1");
 CANBus CANBus2(CAN2SELECT, CAN2RESET, 2, "Bus 2");
 CANBus CANBus3(CAN3SELECT, CAN3RESET, 3, "Bus 3");
