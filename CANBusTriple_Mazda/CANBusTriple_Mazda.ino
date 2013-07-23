@@ -28,16 +28,10 @@
 #define CAN3SELECT 5
 #define CAN3RESET 11
 
-#define D6 27
-#define D8 28
-#define D9 29
-#define D10 30
-#define A0 36
-#define A1 37
-#define A2 38
-#define A3 39
-#define A4 40
-#define A5 41
+#define D6 6
+#define D8 8
+#define D9 9
+#define D10 10
 
 CANBus CANBus1(CAN1SELECT, CAN1RESET, 1, "Bus 1");
 CANBus CANBus2(CAN2SELECT, CAN2RESET, 2, "Bus 2");
@@ -58,6 +52,27 @@ void setup(){
   
   Serial.begin( 115200 );
   pinMode( BOOT_LED, OUTPUT );
+  
+  pinMode( D6, OUTPUT );
+  pinMode( D8, OUTPUT );
+  pinMode( D9, OUTPUT );
+  pinMode( D10, OUTPUT );
+  pinMode( A0, OUTPUT );
+  pinMode( A1, OUTPUT );
+  pinMode( A2, OUTPUT );
+  pinMode( A3, OUTPUT );
+  pinMode( A4, OUTPUT );
+  pinMode( A5, OUTPUT );
+  digitalWrite( D6, LOW );
+  digitalWrite( D8, LOW );
+  digitalWrite( D9, LOW );
+  digitalWrite( D10, LOW );
+  digitalWrite( A0, LOW);
+  digitalWrite( A1, LOW);
+  digitalWrite( A2, LOW);
+  digitalWrite( A3, LOW);
+  digitalWrite( A4, LOW);
+  digitalWrite( A5, LOW);
   
   digitalWrite( BOOT_LED, HIGH );
   delay(100);
@@ -154,8 +169,27 @@ void loop() {
     
   }
   
+  //This will prevent device from forwarding CAN msgs correctly, for testing only
+  //Large delays so a logic analyzer is not needed, verify with DMM, etc.
+  testIOPin( A5, D6, "D6");
+  testIOPin( D6, D8, "D8");
+  testIOPin( D8, D9, "D9");
+  testIOPin( D9, D10, "D10");
+  testIOPin( D10, A0, "A0");
+  testIOPin( A0, A1, "A1");
+  testIOPin( A1, A2, "A2");
+  testIOPin( A2, A3, "A3");
+  testIOPin( A3, A4, "A4");
+  testIOPin( A4, A5, "A5");
 }
 
+void testIOPin(int lastPin, int newPin, char* str)
+{
+  digitalWrite (lastPin, LOW);
+  digitalWrite (newPin, HIGH);
+  Serial.println(strcat(str, " high"));
+  delay(1000);
+}
 
 void sendTestFrame(){
   
