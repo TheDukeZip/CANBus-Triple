@@ -260,7 +260,6 @@ boolean sendMessage( Message msg, CANBus channel ){
 
 
 
-
 void readBus( CANBus channel ){
   
   // byte bus_status;
