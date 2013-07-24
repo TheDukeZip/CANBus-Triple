@@ -46,7 +46,7 @@ CANBus SerialCommand::busses[3] = { CANBus1, CANBus2, CANBus3 }; // Maybe do thi
 byte wheelButton = 0;
 boolean debug = false;
 
-
+char ioLine[10];
 
 void setup(){
   
@@ -187,8 +187,11 @@ void testIOPin(int lastPin, int newPin, char* str)
 {
   digitalWrite (lastPin, LOW);
   digitalWrite (newPin, HIGH);
-  Serial.println(strcat(str, " high"));
-  delay(1000);
+  ioLine[0] = 0;
+  strcat(ioLine, str);
+  strcat(ioLine, " high");
+  Serial.println(ioLine);
+  delay(3000);
 }
 
 void sendTestFrame(){
