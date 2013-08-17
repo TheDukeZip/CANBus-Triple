@@ -14,6 +14,7 @@
 #include "ChannelSwap.h"
 #include "MazdaLED.h"
 #include "SerialCommand.h"
+#include "WhistlerPro3600.h"
 
 
 #define BOOT_LED 7
@@ -88,6 +89,8 @@ void setup(){
   MazdaLED::init( &messageQueue );
   SerialCommand::init( &messageQueue, busses, 0 );
   
+  WhistlerPro3600::init();
+  
 }
 
 void handleInterrupt0(){}
@@ -129,6 +132,8 @@ void loop() {
   // All Middleware ticks (Like loop() for middleware)
   MazdaLED::tick();
   SerialCommand::tick();
+  
+  WhistlerPro3600::tick();
   
   readBus( CANBus1 );
   readBus( CANBus2 );
