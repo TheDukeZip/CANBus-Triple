@@ -18,14 +18,17 @@ SoftwareSerial9 radarSerial(RADAR_RX, RADAR_TX); // RX, TX
 char RadarMsgBuf[_SS_MAX_RX_BUFF];
 uint8_t RadarMsgBufTail = 0;
 
-bool RadarButtonDown = false;
-bool RadarButtonUp = false;
-int  RadarButtonTimer = 0;
+byte RadarWheelButton = 0;
+boolean RadarButtonDown = false;
+uint8_t RadarButtonTimer = 0;
 
 byte RadarStatusC = 0xff;
 byte RadarStatusD = 0x10;
 
-char RadarOutput[9];
+char RadarOutput[13];
+
+boolean RadarDebug = false;
+
 
 class WhistlerPro3600 {
   public:
@@ -38,7 +41,8 @@ class WhistlerPro3600 {
     static void RadarSendQuiet();
     static void RadarSendDark();
     static void RadarSendCity();
-    static void RadarProcessInput();
+    static void RadarSendNone();
+    static void RadarGetWheelButton();
 };
 
 void WhistlerPro3600::init()
@@ -50,6 +54,8 @@ void WhistlerPro3600::tick()
 {
   bool bTemp = 0;
 
+  RadarGetWheelButton();
+  
   if( (millis() % 32) < 1 ) RadarSendStatus();
 
   if(!RadarButtonDown)
@@ -72,20 +78,6 @@ void WhistlerPro3600::RadarSendStatus()
   //You don't need to send the status every 32ms like the unit does
   //only need to send on button down or button up events
   //the interface box sometimes misses a msg, send at least twice to be sure
-  if(RadarButtonUp)
-  {
-    radarSerial.write9(RADAR_STATUS_A, 1);
-    radarSerial.write9(RADAR_STATUS_B, 1);
-    radarSerial.write9(RadarStatusC, 1);
-    radarSerial.write9(RadarStatusD, 1);
-    radarSerial.write9(RADAR_STATUS_E, 1);
-    RadarButtonTimer++;
-    if(RadarButtonTimer > 1)
-    {
-      RadarButtonUp = false;
-      RadarButtonTimer = 0;
-    }
-  }
   if(RadarButtonDown)
   {
     radarSerial.write9(RADAR_STATUS_A, 1);
@@ -94,43 +86,33 @@ void WhistlerPro3600::RadarSendStatus()
     radarSerial.write9(RadarStatusD, 1);
     radarSerial.write9(RADAR_STATUS_E, 1);
     RadarButtonTimer++;
-    RadarButtonDown = false;
-    RadarButtonUp = true;
-    RadarStatusC = 0xff;
-    RadarStatusD = 0x10;
     
     if(RadarButtonTimer > 1)
     {
       RadarButtonDown = false;
-      RadarButtonUp = true;
       RadarButtonTimer = 0;
-      RadarStatusC = 0xff;
-      RadarStatusD = 0x10;
     }
   }
 }
 
 void WhistlerPro3600::RadarWriteOutput()
 {
-  char LocalOutput[9] = "        ";
+  char LocalOutput[13] = "            ";
 
   if(RadarMsgBuf[0] == 0x02)
   {
     for(int i = 2; i < 10; i++)
-      LocalOutput[i - 2] = RadarMsgBuf[i];
+      LocalOutput[i] = RadarMsgBuf[i];
     if(strcmp(RadarOutput, LocalOutput))
     {
       sprintf( RadarOutput, LocalOutput);
-      Serial.println(RadarOutput);          //TODO: To MazdaLED instead of USB Serial
-    }
-  }
-  RadarMsgBufTail = 0; 
+      if(RadarDebug) Serial.println(RadarOutput);
+      if(RadarOutput[2] != '-') MazdaLED::showStatusMessage(RadarOutput, 4000);  //This filters display if there are no active alerts or config changes
+    }                                                                            //TODO: Filter based on arrows in that char if GPS addon is present
+  }                                                                              //TODO: Add a mode where LCD constantly is displaying Radar output even if no alerts
+  RadarMsgBufTail = 0;                                                           //TODO: Possibly do something in future so Radar overrides 'stock' and 'status' in MazdaLED
 }
 
-
-//TODO: These were previously triggered off of USB serial input
-//  Need to trigger these off steering buttons
-//  Need possibility for multiple simultaneous presses
 void WhistlerPro3600::RadarSendPower()
 {
   RadarStatusC = 0xfe;
@@ -159,18 +141,40 @@ void WhistlerPro3600::RadarSendCity()
   RadarButtonDown = true;
 }
 
-void WhistlerPro3600::RadarProcessInput()
+void WhistlerPro3600::RadarSendNone()
 {
-  char c = Serial.read();
+  RadarStatusC = 0xff;
+  RadarStatusD = 0x10;
+  RadarButtonDown = true;
+}
+
+//TODO: Only send if in new mode where always displaying radar output (except quiet button when displaying alert)
+//      This will free up these buttons for other uses
+void WhistlerPro3600::RadarGetWheelButton()
+{
+  byte button = WheelButton::getButtonDown();
+  
+  if(RadarWheelButton != button)
+  {
+    RadarWheelButton = button;
     
-  if(c == 'p') 
-    RadarSendPower();
-  else if(c == 'd')
-    RadarSendDark();
-  else if(c == 'q')
-    RadarSendQuiet();
-  else if(c == 'c')
-    RadarSendCity();
-  else if(c == ' ')
-    sprintf( RadarOutput, "        "); //Use space to see current display
+    switch(RadarWheelButton)
+    {
+      case B10000010:    //Back and Left
+        RadarSendPower();
+        break;
+      case B00001010:    //Back and Enter
+        RadarSendDark();
+        break;
+      case B00100010:    //Back and Up
+        RadarSendCity();
+        break;
+      case B00010010:    //Back and Down
+        RadarSendQuiet();
+        break;
+      case B00000000:    //None
+        RadarSendNone();
+        break;
+    }
+  }
 }
