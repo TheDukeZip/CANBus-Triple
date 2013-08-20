@@ -105,18 +105,18 @@ void loop() {
    wheelButton = button;
    
    switch(wheelButton){
-     case B10000000:
-       MazdaLED::showStatusMessage("LEFT        ", 2000);
-     break;
-     case B01000000:
-       MazdaLED::showStatusMessage("DERP        ", 2000);
-     break;
-     case B00100000:
-       MazdaLED::showStatusMessage("HERP        ", 2000);
-     break;
-     case B00010000:
-       MazdaLED::showStatusMessage("NERP        ", 2000);
-     break;
+//     case B10000000:
+//       MazdaLED::showStatusMessage("LEFT        ", 2000);
+//     break;
+//     case B01000000:
+//       MazdaLED::showStatusMessage("DERP        ", 2000);
+//     break;
+//     case B00100000:
+//       MazdaLED::showStatusMessage("HERP        ", 2000);
+//     break;
+//     case B00010000:
+//       MazdaLED::showStatusMessage("NERP        ", 2000);
+//     break;
      case B1000010:
        MazdaLED::enabled = !MazdaLED::enabled;
        EEPROM.write(0, MazdaLED::enabled); // For testing, proper settings in EEPROM TBD

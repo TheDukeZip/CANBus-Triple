@@ -1,11 +1,14 @@
+//Integration with Whistler Pro-3600
+//
+//See http://phzero.net/?q=whistler for technical details on connecting Whistler to CBT
+
 // Quick hack implementation of 9 bit serial packets - adapted from standard SoftwareSerial lib
 // Maybe in the future update SoftwareSerial to properly support different parity options
 #include "SoftwareSerial9.h"
 
-//Unknown if software serial will be fast enough while processing all 3 CAN busses at same time
+//Software serial seems to be fast enough while processing all 3 CAN busses at same time
 //Other option is to utilize hardware serial port on digital pins 0 and 1 which are wired to 
 // CAN interrupts but not currently in use.  HW Serial can safely use 8N2 setting - 9th bit always 1.
-// NEEDS TESTING WHILE RUNNING IN CAR!
 #define RADAR_RX	10		//RX is yellow to radar detector interface box
 #define RADAR_TX	6		//TX is green to radar detector interface box
 #define RADAR_BAUD	9600
@@ -27,6 +30,12 @@ byte RadarStatusD = 0x10;
 
 char RadarOutput[13];
 
+enum RADAR_MODE {
+  RADAR_MODE_ALERTS_ONLY,
+  RADAR_MODE_ALWAYS_ON
+};
+
+RADAR_MODE RadarMode = RADAR_MODE_ALERTS_ONLY;
 boolean RadarDebug = false;
 
 
@@ -66,10 +75,12 @@ void WhistlerPro3600::tick()
       RadarMsgBufTail++;
     }
 
-    if(RadarMsgBufTail > 13)
+    if(RadarMsgBufTail > 13)  //Have a full message from Whistler
     {
       RadarWriteOutput();
     }
+    //Update the screen once per second in this mode so MazdaLED doesn't take over
+    else if(RadarMode == RADAR_MODE_ALWAYS_ON && (millis() % 1000) < 1) RadarWriteOutput();
   }
 }
 
@@ -95,7 +106,8 @@ void WhistlerPro3600::RadarSendStatus()
   }
 }
 
-void WhistlerPro3600::RadarWriteOutput()
+//TODO: Possibly do something in future so Radar alerts override 'stock' and 'status' in MazdaLED
+void WhistlerPro3600::RadarWriteOutput()  
 {
   char LocalOutput[13] = "            ";
 
@@ -103,16 +115,29 @@ void WhistlerPro3600::RadarWriteOutput()
   {
     for(int i = 2; i < 10; i++)
       LocalOutput[i] = RadarMsgBuf[i];
-    if(strcmp(RadarOutput, LocalOutput))
+    if(strcmp(RadarOutput, LocalOutput) || RadarMode == RADAR_MODE_ALWAYS_ON)
     {
       sprintf( RadarOutput, LocalOutput);
       if(RadarDebug) Serial.println(RadarOutput);
-      if(RadarOutput[2] != '-') MazdaLED::showStatusMessage(RadarOutput, 4000);  //This filters display if there are no active alerts or config changes
-    }                                                                            //TODO: Filter based on arrows in that char if GPS addon is present
-  }                                                                              //TODO: Add a mode where LCD constantly is displaying Radar output even if no alerts
-  RadarMsgBufTail = 0;                                                           //TODO: Possibly do something in future so Radar overrides 'stock' and 'status' in MazdaLED
+      
+      //TODO: Filter based on arrows in that char if GPS addon is present
+      if((RadarMode == RADAR_MODE_ALERTS_ONLY && RadarOutput[2] != '-') || RadarMode == RADAR_MODE_ALWAYS_ON)                          
+      {
+        //Convert Whistler chars to MazdaSpeed3 chars
+        for(int i = 2; i < 10; i++)                      
+        {
+          if(RadarOutput[i] == '}') RadarOutput[i] = 0xdf;       //Supposed to be degrees
+          else if(RadarOutput[i] == '*') RadarOutput[i] = 0xef;  //Asterisk
+          else if(RadarOutput[i] == '/') RadarOutput[i] = 0xf0;  //Supposed to be full block
+        }
+        MazdaLED::showStatusMessage(RadarOutput, 4000);  
+      }
+    }
+  }
+  RadarMsgBufTail = 0;
 }
 
+//TODO: Need to support simultaneous pushes for some settings features
 void WhistlerPro3600::RadarSendPower()
 {
   RadarStatusC = 0xfe;
@@ -148,8 +173,6 @@ void WhistlerPro3600::RadarSendNone()
   RadarButtonDown = true;
 }
 
-//TODO: Only send if in new mode where always displaying radar output (except quiet button when displaying alert)
-//      This will free up these buttons for other uses
 void WhistlerPro3600::RadarGetWheelButton()
 {
   byte button = WheelButton::getButtonDown();
@@ -160,17 +183,24 @@ void WhistlerPro3600::RadarGetWheelButton()
     
     switch(RadarWheelButton)
     {
-      case B10000010:    //Back and Left
-        RadarSendPower();
+      case B10000000:    //Left - Power
+        if(RadarMode == RADAR_MODE_ALWAYS_ON) RadarSendPower();
         break;
-      case B00001010:    //Back and Enter
-        RadarSendDark();
+      case B01000000:    //Right - Dark
+        if(RadarMode == RADAR_MODE_ALWAYS_ON) RadarSendDark();
         break;
-      case B00100010:    //Back and Up
-        RadarSendCity();
+      case B00100000:    //Up - City
+        if(RadarMode == RADAR_MODE_ALWAYS_ON) RadarSendCity();
         break;
-      case B00010010:    //Back and Down
-        RadarSendQuiet();
+      case B00010000:    //Down - Quiet
+        if(RadarMode == RADAR_MODE_ALWAYS_ON) RadarSendQuiet();
+        break;
+      case B00000010:    //Back - if in alert mode - Quiet
+        if(RadarMode == RADAR_MODE_ALERTS_ONLY) RadarSendQuiet;
+        break;
+      case B00010010:    //Back and Down - switch mode
+        if(RadarMode == RADAR_MODE_ALERTS_ONLY) RadarMode = RADAR_MODE_ALWAYS_ON;
+        else RadarMode = RADAR_MODE_ALERTS_ONLY;
         break;
       case B00000000:    //None
         RadarSendNone();
